@@ -174,3 +174,5 @@ az network firewall update \
 --resource-group $resourceGroupName \
 --firewall-policy WanBasePolicy
                                                                      
+# access the Application Gateway listener
+curl http://$(az network public-ip show --name myAGPublicIPAddress --resource-group $resourceGroupName --query ipAddress -o tsv)

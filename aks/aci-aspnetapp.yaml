@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aci-aspnetapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aci-aspnetapp
+  template:
+    metadata:
+      labels:
+        app: aci-aspnetapp
+    spec:
+      containers:
+      - image: "mcr.microsoft.com/dotnet/core/samples:aspnetapp"
+        name: aspnetapp-image
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 250m
+            memory: 250Mi
+          limits:
+            cpu: 250m
+            memory: 250Mi
+      nodeSelector:
+        kubernetes.io/role: agent
+        beta.kubernetes.io/os: linux
+        type: virtual-kubelet
+      tolerations:
+      - key: virtual-kubelet.io/provider
+        operator: Exists
+      - key: azure.com/aci
+        effect: NoSchedule
+      
+---
+
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: aci-aspnetapp-hpa
+spec:
+  maxReplicas: 3 # define max replica count
+  minReplicas: 1  # define min replica count
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: aci-aspnetapp
+  targetCPUUtilizationPercentage: 50 # target CPU utilization
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: aci-aspnetapp
+spec:
+  selector:
+    app: aci-aspnetapp
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+
+---
+
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: aci-aspnetapp
+  annotations:
+    kubernetes.io/ingress.class: azure/application-gateway
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        backend:
+          serviceName: aci-aspnetapp
+          servicePort: 80
+

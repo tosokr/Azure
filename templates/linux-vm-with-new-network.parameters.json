@@ -1,0 +1,31 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "vmName": {
+            "value": "csgo-container-build"
+        },
+        "adminUsername": {
+            "value": "tosokr"
+        },
+        "authenticationType": {
+            "value": "sshPublicKey"
+        },
+          "adminPasswordOrKey": {
+            "value": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQD9qMhEKWRtL0TMYfaMfwAcnMehUzuRR17M68dKsEIBZlk8puk68v3twzeOAtXwBNxcgBeofA7qCxuagUo2iKd2PqB6SBpH2kOPA1tHZeV1fDjCiwk4AmO2iI9KY94mPgNhXQFKwOCaRgzZV2Cp7QGjNX/puDHAgy/x+FF7qQwE9RpJYSzXJvTEWH0/a7fQun+xpnuza7CdZo4NhmI01WfxwrQLVAOsL6iHy1PjIoalpbU+mJ7oLyDdtAPwCY55rz8oqqJR4ORiXOQoCw/vAp2ifgfrNZEBU9EKsHuPeNbLmFtsGxG+RkrNapYe41THmSyrH+SvY3mCFvFC2P7WdUUvDpSRgWwP8MZdF6Z425utfEm0Y5+mAYDoVU0xtBk0VI6tTWHQ9pvclkQPR+mlyOQQgpZsyyldBBh+F8VBjSxZGTdAih9FQA18P5GQir2RD5CGF/Ruff12RnwHdhBij2Njj+q8l9SxBPhFiRm2O/pQhaolaiY0EuK6xe+5Er9pjzIPdNQDGVcJO1v3fC8R6OifzTzJajxvriN8Nufz80Wk+d9egmgB26se+XOaKpB8O+5Kj1TPDP+urp+YNowlkAzv8PKLsz1qbHyjEjZXj9sElqqpNSB3vgDeyoAX7va5mAneJ87lNX0Mbn70lLZGPA55ZptW3c7FOc3ygqG3ixs6Qw== aleksandar.stefanov@devoteam.nl"
+          },
+          "ubuntuOSVersion": {
+            "value": "16.04.0-LTS"
+          },
+          "VmSize":{
+            "value": "Standard_B2s"
+          },
+          "virtualNetworkName":
+          {
+            "value": "vNet-csgo-container-build"
+          },
+          "subnetName":{
+            "value": "subnet-1"
+          }                  
+    }
+}

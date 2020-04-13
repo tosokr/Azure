@@ -1,0 +1,8 @@
+apiVersion: "aadpodidentity.k8s.io/v1"
+kind: AzureIdentity
+metadata:
+  name: azureidentity
+spec:
+  type: 1
+  ResourceID: /subscriptions/f1aa6a06-4aae-46b3-887c-983d96f64131/resourcegroups/MC_rg-aks_tosokr_westeurope/providers/Microsoft.ManagedIdentity/userAssignedIdentities/azureIdentity
+  ClientID: 1179b76a-64c5-45c8-aa71-d6bb35cafe50

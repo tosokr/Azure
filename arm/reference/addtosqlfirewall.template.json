@@ -1,0 +1,34 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "webAppOutboundIpAddresses": {
+            "type": "array",
+            "metadata": {
+                "description": "Array of possible Outbound IP addresses for the Web Application"
+            }
+        },
+        "sqlServerName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the logical SQL Server"
+            }
+        }
+    },
+    "resources": [
+        {
+            "comments": "Add the Outbound IP Addresses from the Web App",
+            "type": "Microsoft.Sql/servers/firewallRules",
+            "apiVersion": "2015-05-01-preview",
+            "name": "[concat(parameters('sqlServerName'), '/Allow WebApp Outbound IP ',copyIndex('webAppOutboundIPAddressesCopy'))]",
+            "properties": {
+                "startIpAddress": "[parameters('webAppOutboundIpAddresses')[copyIndex('webAppOutboundIPAddressesCopy')]]",
+                "endIpAddress": "[parameters('webAppOutboundIpAddresses')[copyIndex('webAppOutboundIPAddressesCopy')]]"
+            },
+            "copy": {
+                "name": "webAppOutboundIPAddressesCopy",
+                "count": "[length(parameters('webAppOutboundIpAddresses'))]"
+            }
+        }
+    ]
+}

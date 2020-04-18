@@ -1,0 +1,114 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "authorName": {
+            "type": "string",
+            "defaultValue": "tosokr",
+            "metadata": {
+                "description": "Name to use for generating the resource names relevant for this template"
+            }
+        },
+        "location": {
+            "type": "string",
+            "defaultValue": "[resourceGroup().location]",
+            "metadata": {
+                "description": "Location where to create the resources"
+            }
+        }       
+    },
+    "variables": {
+        "appServicePlanName": "[concat(parameters('authorName'),uniqueString(resourceGroup().id),'-asp')]",
+        "webAppName":"[concat(parameters('authorName'),uniqueString(resourceGroup().id),'-as')]",
+        "sqlServerName":"[concat(parameters('authorName'),uniqueString(resourceGroup().id),'-dbs')]",
+        "addToSqlFirewallTemplateUrl": "[replace(deployment().properties.templateLink.uri, '/master.template.json', '/addtosqlfirewall.template.json')]"
+ 
+    },
+    "resources": [
+        {
+            "comments": "Create the App Service Plan",
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2018-02-01",
+            "name": "[variables('appServicePlanName')]",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "S1"
+            },
+            "kind": "linux",
+            "properties": {
+                "perSiteScaling": false,
+                "maximumElasticWorkerCount": 1,
+                "isSpot": false,
+                "reserved": false,
+                "isXenon": false,
+                "hyperV": false,
+                "targetWorkerCount": 0,
+                "targetWorkerSizeId": 0
+            }
+        },
+        {
+            "comments": "Create the Web App",
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2018-11-01",
+            "name": "[variables('webAppName')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]"
+            ],
+            "kind": "app",
+            "properties": {
+                "enabled": true,
+                "hostNameSslStates": [
+                    {
+                        "name": "[concat(variables('webAppName'), '.azurewebsites.net')]",
+                        "sslState": "Disabled",
+                        "hostType": "Standard"
+                    },
+                    {
+                        "name": "[concat(variables('webAppName'),'.scm.azurewebsites.net')]",
+                        "sslState": "Disabled",
+                        "hostType": "Repository"
+                    }
+                ],
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",                
+                "httpsOnly": true
+            }
+        },
+        {
+            "comments": "Create the logical SQL Server",
+            "type": "Microsoft.Sql/servers",
+            "apiVersion": "2019-06-01-preview",
+            "name": "[variables('sqlServerName')]",
+            "location": "[parameters('location')]",
+            "kind": "v12.0",
+            "properties": {
+                "administratorLogin": "[parameters('authorName')]",
+                "administratorLoginPassword": "[concat('P',uniqueString(variables('sqlServerName'),'!'))]",
+                "version": "12.0",
+                "publicNetworkAccess": "Enabled"
+            }            
+        },
+        {
+            "comments":"In separate template (because of the reference nightmare!!!) configure the SQL firewall rules",
+            "apiVersion": "2017-05-10",
+            "name": "webAppIPsSQLFirewall",
+            "type": "Microsoft.Resources/deployments",
+            "properties": {
+              "mode": "Incremental",
+              "templateLink": {
+                 "uri":"[variables('addToSqlFirewallTemplateUrl')]",
+                 "contentVersion":"1.0.0.0"
+              },              
+              "parameters": {
+                "webAppOutboundIpAddresses": {"value": "[split(reference(concat('Microsoft.Web/sites/',variables('webAppName'))).possibleOutboundIpAddresses,',')]" }, 
+                "sqlServerName": {"value": "[variables('sqlServerName')]" }
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers', variables('sqlServerName'))]",
+                "[resourceId('Microsoft.Web/sites', variables('webAppName'))]"
+              ]
+         }          
+        
+    ]
+}

@@ -1,221 +1,282 @@
 {
-    "definition": {
-        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
-        "actions": {
-            "Condition": {
-                "actions": {
-                    "Filter_array": {
-                        "inputs": {
-                            "from": "@body('Parse_JSON')",
-                            "where": "@greater(item()['confidence'], 0.9)"
-                        },
-                        "runAfter": {
-                            "Parse_JSON": [
-                                "Succeeded"
-                            ]
-                        },
-                        "type": "Query"
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "logicAppName": {
+            "defaultValue": "demoLogicApp",
+            "type": "String"
+        },
+        "connections_azureblob_name": {
+            "defaultValue": "azureblob",
+            "type": "String"
+        },
+        "connections_cognitiveservicescomputervision_name": {
+            "defaultValue": "cognitiveservicescomputervision",
+            "type": "String"
+        }
+    },
+    "variables": {
+        "subscriptionId": "[subscription().subscriptionId]",
+        "location":"[resourceGroup().location]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Web/connections",
+            "apiVersion": "2016-06-01",
+            "name": "[parameters('connections_azureblob_name')]",
+            "location": "[variables('location')]",
+            "properties": {
+                "displayName": "integrationDemo",
+                "customParameterValues": {},
+                "api": {
+                    "id": "[concat('/subscriptions/',variables('subscriptionId'),'/providers/Microsoft.Web/locations/',variables('location'),'/managedApis/', parameters('connections_azureblob_name'))]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Web/connections",
+            "apiVersion": "2016-06-01",
+            "name": "[parameters('connections_cognitiveservicescomputervision_name')]",
+            "location": "westeurope",
+            "properties": {
+                "displayName": "computerVision",
+                "customParameterValues": {},
+                "api": {
+                    "id": "[concat('/subscriptions/',variables('subscriptionId'),'/providers/Microsoft.Web/locations/',variables('location'),'/managedApis/', parameters('connections_cognitiveservicescomputervision_name'))]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('logicAppName')]",
+            "location": "westeurope",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/connections', parameters('connections_azureblob_name'))]",
+                "[resourceId('Microsoft.Web/connections', parameters('connections_cognitiveservicescomputervision_name'))]"
+            ],
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
                     },
-                    "For_each": {
-                        "actions": {
-                            "Append_to_array_variable": {
-                                "inputs": {
-                                    "name": "tags",
-                                    "value": "@items('For_each')?['name']"
-                                },
-                                "runAfter": {},
-                                "type": "AppendToArrayVariable"
-                            }
-                        },
-                        "foreach": "@body('Filter_array')",
-                        "runAfter": {
-                            "Filter_array": [
-                                "Succeeded"
-                            ]
-                        },
-                        "type": "Foreach"
-                    },
-                    "HTTP": {
-                        "inputs": {
-                            "headers": {
-                                "x-ms-meta-tags": "@{variables('tags')}"
+                    "triggers": {
+                        "When_a_blob_is_added_or_modified_(properties_only)": {
+                            "recurrence": {
+                                "frequency": "Second",
+                                "interval": 5
                             },
-                            "method": "PUT",
-                            "uri": "@{concat(body('Create_SAS_URI_by_path')?['WebUrl'],'&comp=metadata')}"
-                        },
-                        "runAfter": {
-                            "For_each": [
-                                "Succeeded"
-                            ]
-                        },
-                        "type": "Http"
+                            "splitOn": "@triggerBody()",
+                            "metadata": {
+                                "JTJmaW1hZ2Vz": "/images",
+                                "JTJmcGljdHVyZXM=": "/pictures"
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['azureblob_1']['connectionId']"
+                                    }
+                                },
+                                "method": "get",
+                                "path": "/datasets/default/triggers/batch/onupdatedfile",
+                                "queries": {
+                                    "folderId": "JTJmaW1hZ2Vz",
+                                    "maxFileCount": 1
+                                }
+                            }
+                        }
                     },
-                    "Parse_JSON": {
-                        "inputs": {
-                            "content": "@body('Tag_Image')?['tags']",
-                            "schema": {
-                                "items": {
-                                    "properties": {
-                                        "confidence": {
-                                            "type": "number"
-                                        },
-                                        "name": {
-                                            "type": "string"
+                    "actions": {
+                        "Condition": {
+                            "actions": {
+                                "Filter_array": {
+                                    "runAfter": {
+                                        "Parse_JSON": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Query",
+                                    "inputs": {
+                                        "from": "@body('Parse_JSON')",
+                                        "where": "@greater(item()['confidence'], 0.9)"
+                                    }
+                                },
+                                "For_each": {
+                                    "foreach": "@body('Filter_array')",
+                                    "actions": {
+                                        "Append_to_array_variable": {
+                                            "runAfter": {},
+                                            "type": "AppendToArrayVariable",
+                                            "inputs": {
+                                                "name": "tags",
+                                                "value": "@items('For_each')?['name']"
+                                            }
                                         }
                                     },
-                                    "required": [
-                                        "name",
-                                        "confidence"
-                                    ],
-                                    "type": "object"
+                                    "runAfter": {
+                                        "Filter_array": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Foreach"
                                 },
-                                "type": "array"
-                            }
-                        },
-                        "runAfter": {
-                            "Tag_Image": [
-                                "Succeeded"
-                            ]
-                        },
-                        "type": "ParseJson"
-                    },
-                    "Tag_Image": {
-                        "inputs": {
-                            "body": {
-                                "url": "@body('Create_SAS_URI_by_path')?['WebUrl']"
-                            },
-                            "host": {
-                                "connection": {
-                                    "name": "@parameters('$connections')['cognitiveservicescomputervision_1']['connectionId']"
+                                "HTTP": {
+                                    "runAfter": {
+                                        "For_each": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Http",
+                                    "inputs": {
+                                        "headers": {
+                                            "x-ms-meta-tags": "@{variables('tags')}"
+                                        },
+                                        "method": "PUT",
+                                        "uri": "@{concat(body('Create_SAS_URI_by_path')?['WebUrl'],'&comp=metadata')}"
+                                    }
+                                },
+                                "Parse_JSON": {
+                                    "runAfter": {
+                                        "Tag_Image": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ParseJson",
+                                    "inputs": {
+                                        "content": "@body('Tag_Image')?['tags']",
+                                        "schema": {
+                                            "items": {
+                                                "properties": {
+                                                    "confidence": {
+                                                        "type": "number"
+                                                    },
+                                                    "name": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "name",
+                                                    "confidence"
+                                                ],
+                                                "type": "object"
+                                            },
+                                            "type": "array"
+                                        }
+                                    }
+                                },
+                                "Tag_Image": {
+                                    "runAfter": {},
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": {
+                                            "url": "@body('Create_SAS_URI_by_path')?['WebUrl']"
+                                        },
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['cognitiveservicescomputervision_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/vision/v2.0/tag",
+                                        "queries": {
+                                            "format": "Image URL"
+                                        }
+                                    }
                                 }
                             },
-                            "method": "post",
-                            "path": "/vision/v2.0/tag",
-                            "queries": {
-                                "format": "Image URL"
+                            "runAfter": {
+                                "HTTP_-_Get_blob_metadata": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "expression": {
+                                "and": [
+                                    {
+                                        "not": {
+                                            "contains": [
+                                                "@string(outputs('HTTP_-_Get_blob_metadata')['headers'])",
+                                                "x-ms-meta-tags"
+                                            ]
+                                        }
+                                    }
+                                ]
+                            },
+                            "type": "If"
+                        },
+                        "Create_SAS_URI_by_path": {
+                            "runAfter": {},
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "Permissions": "Read,Write"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['azureblob_1']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/CreateSharedLinkByPath",
+                                "queries": {
+                                    "path": "@triggerBody()?['Path']"
+                                }
                             }
                         },
-                        "runAfter": {},
-                        "type": "ApiConnection"
-                    }
-                },
-                "expression": {
-                    "and": [
-                        {
-                            "not": {
-                                "contains": [
-                                    "@string(outputs('HTTP_-_Get_blob_metadata')['headers'])",
-                                    "x-ms-meta-tags"
+                        "HTTP_-_Get_blob_metadata": {
+                            "runAfter": {
+                                "Initialize_variable": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Http",
+                            "inputs": {
+                                "method": "GET",
+                                "uri": "@{concat(body('Create_SAS_URI_by_path')?['WebUrl'],'&comp=metadata')}"
+                            }
+                        },
+                        "Initialize_variable": {
+                            "runAfter": {
+                                "Create_SAS_URI_by_path": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "tags",
+                                        "type": "array"
+                                    }
                                 ]
                             }
                         }
-                    ]
-                },
-                "runAfter": {
-                    "HTTP_-_Get_blob_metadata": [
-                        "Succeeded"
-                    ]
-                },
-                "type": "If"
-            },
-            "Create_SAS_URI_by_path": {
-                "inputs": {
-                    "body": {
-                        "Permissions": "Read,Write"
                     },
-                    "host": {
-                        "connection": {
-                            "name": "@parameters('$connections')['azureblob_1']['connectionId']"
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {
+                            "azureblob_1": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('connections_azureblob_name'))]",
+                                "connectionName": "azureblob",
+                                "id": "[concat('/subscriptions/',variables('subscriptionId'),'/providers/Microsoft.Web/locations/',variables('location'),'/managedApis/azureblob')]"
+                            },
+                            "cognitiveservicescomputervision_1": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('connections_cognitiveservicescomputervision_name'))]",
+                                "connectionName": "cognitiveservicescomputervision",
+                                "id": "[concat('/subscriptions/',variables('subscriptionId'),'/providers/Microsoft.Web/locations/',variables('location'),'/managedApis/cognitiveservicescomputervision')]"
+                            }
                         }
-                    },
-                    "method": "post",
-                    "path": "/datasets/default/CreateSharedLinkByPath",
-                    "queries": {
-                        "path": "@triggerBody()?['Path']"
                     }
-                },
-                "runAfter": {},
-                "type": "ApiConnection"
-            },
-            "HTTP_-_Get_blob_metadata": {
-                "inputs": {
-                    "method": "GET",
-                    "uri": "@{concat(body('Create_SAS_URI_by_path')?['WebUrl'],'&comp=metadata')}"
-                },
-                "runAfter": {
-                    "Initialize_variable": [
-                        "Succeeded"
-                    ]
-                },
-                "type": "Http"
-            },
-            "Initialize_variable": {
-                "inputs": {
-                    "variables": [
-                        {
-                            "name": "tags",
-                            "type": "array"
-                        }
-                    ]
-                },
-                "runAfter": {
-                    "Create_SAS_URI_by_path": [
-                        "Succeeded"
-                    ]
-                },
-                "type": "InitializeVariable"
-            }
-        },
-        "contentVersion": "1.0.0.0",
-        "outputs": {},
-        "parameters": {
-            "$connections": {
-                "defaultValue": {},
-                "type": "Object"
-            }
-        },
-        "triggers": {
-            "When_a_blob_is_added_or_modified_(properties_only)": {
-                "inputs": {
-                    "host": {
-                        "connection": {
-                            "name": "@parameters('$connections')['azureblob_1']['connectionId']"
-                        }
-                    },
-                    "method": "get",
-                    "path": "/datasets/default/triggers/batch/onupdatedfile",
-                    "queries": {
-                        "folderId": "JTJmaW1hZ2Vz",
-                        "maxFileCount": 1
-                    }
-                },
-                "metadata": {
-                    "JTJmaW1hZ2Vz": "/images",
-                    "JTJmcGljdHVyZXM=": "/pictures"
-                },
-                "recurrence": {
-                    "frequency": "Second",
-                    "interval": 5
-                },
-                "splitOn": "@triggerBody()",
-                "type": "ApiConnection"
-            }
-        }
-    },
-    "parameters": {
-        "$connections": {
-            "value": {
-                "azureblob_1": {
-                    "connectionId": "/subscriptions/<YOUR_SUBSCRIPTION_ID>/resourceGroups/rg-demo/providers/Microsoft.Web/connections/azureblob",
-                    "connectionName": "azureblob",
-                    "id": "/subscriptions/<YOUR_SUBSCRIPTION_ID>/providers/Microsoft.Web/locations/westeurope/managedApis/azureblob"
-                },
-                "cognitiveservicescomputervision_1": {
-                    "connectionId": "/subscriptions/<YOUR_SUBSCRIPTION_ID>/resourceGroups/rg-demo/providers/Microsoft.Web/connections/cognitiveservicescomputervision",
-                    "connectionName": "cognitiveservicescomputervision",
-                    "id": "/subscriptions/<YOUR_SUBSCRIPTION_ID>/providers/Microsoft.Web/locations/westeurope/managedApis/cognitiveservicescomputervision"
                 }
             }
         }
-    }
+    ]
 }
